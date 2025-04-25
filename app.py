@@ -1,126 +1,86 @@
 import streamlit as st
-import random
+from units import UNITS, convert_value
 
-def evaluate_password_strength(password):
-    """
-    Evaluates the strength of a password based on defined criteria.
-    
-    Args:
-        password (str): The password to evaluate.
-    
-    Returns:
-        tuple: (score, strength, message) where score is an integer (0-5),
-               strength is "Weak", "Moderate", or "Strong", and message is feedback.
-    """
-    score = 0
-    feedback = []
-    
-    # Check length
-    if len(password) >= 8:
-        score += 2
-    else:
-        feedback.append("Make it at least 8 characters long.")
-    
-    # Check for uppercase and lowercase
-    has_upper = any(c.isupper() for c in password)
-    has_lower = any(c.islower() for c in password)
-    if has_upper and has_lower:
-        score += 1
-    else:
-        if not has_upper:
-            feedback.append("Include at least one uppercase letter.")
-        if not has_lower:
-            feedback.append("Include at least one lowercase letter.")
-    
-    # Check for digits
-    if any(c.isdigit() for c in password):
-        score += 1
-    else:
-        feedback.append("Include at least one digit.")
-    
-    # Check for special characters
-    special_chars = "!@#$%^&*"
-    if any(c in special_chars for c in password):
-        score += 1
-    else:
-        feedback.append("Include at least one special character (!@#$%^&*).")
-    
-    # Determine strength based on score
-    if score <= 2:
-        strength = "Weak"
-    elif score <= 4:
-        strength = "Moderate"
-    else:
-        strength = "Strong"
-    
-    # Generate feedback message
-    if len(password) == 0:
-        message = "Password cannot be empty."
-    elif strength == "Strong":
-        message = "Your password is strong."
-    else:
-        message = f"Your password is {strength}. " + " ".join(feedback)
-    
-    return score, strength, message
+# Set page configuration
+st.set_page_config(page_title="Advanced Unit Converter", layout="wide")
 
-def generate_strong_password(length=12):
-    """
-    Generates a strong random password meeting all criteria.
-    
-    Args:
-        length (int): Desired password length (minimum 4).
-    
-    Returns:
-        str: A strong password.
-    """
-    if length < 4:
-        raise ValueError("Password length must be at least 4 to include all character types.")
-    
-    # Define character sets
-    uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-    lowercase = 'abcdefghijklmnopqrstuvwxyz'
-    digits = '0123456789'
-    special = '!@#$%^&*'
-    
-    # Ensure at least one character from each category
-    password = [
-        random.choice(uppercase),
-        random.choice(lowercase),
-        random.choice(digits),
-        random.choice(special)
-    ]
-    
-    # Fill remaining length with random characters
-    all_chars = uppercase + lowercase + digits + special
-    password += [random.choice(all_chars) for _ in range(length - 4)]
-    
-    # Shuffle to avoid predictable patterns
-    random.shuffle(password)
-    
-    return ''.join(password)
+# Custom CSS for color tones and fade-in animation
+st.markdown("""
+<style>
+body {
+    background-color: #2b2b2b;
+    color: #e0e0e0;
+}
+.stApp {
+    background-color: #2b2b2b;
+}
+.result {
+    animation: fadeIn 0.5s;
+    background-color: #3a3a3a;
+    padding: 10px;
+    border-radius: 5px;
+    color: #90ee90;
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.sidebar .sidebar-content {
+    background-color: #333333;
+}
+</style>
+""", unsafe_allow_html=True)
 
-# Streamlit Application
-st.title("Password Strength Meter")
-st.write("Check the strength of your password or generate a strong one.")
+# Title
+st.title("Advanced Unit Converter")
 
-# Password input
-password = st.text_input("Enter your password:", type="password")
+# Sidebar for category selection with emojis
+categories = [
+    '📏 Length',
+    '⚖️ Weight',
+    '🌡️ Temperature',
+    '💧 Volume',
+    '🏞️ Area',
+    '🚀 Speed',
+    '⏳ Time'
+]
+category_display = st.sidebar.selectbox("Select Category", categories, key='category')
+category = category_display.split(' ', 1)[1]  # Remove emoji for internal use
 
-# Evaluate and display strength
-if password:
-    score, strength, message = evaluate_password_strength(password)
-    if strength == "Strong":
-        st.success(f"Strength: {strength}")
-    elif strength == "Moderate":
-        st.warning(f"Strength: {strength}")
-    else:
-        st.error(f"Strength: {strength}")
-    st.write(message)
+# Determine units based on category
+if category == 'Temperature':
+    units = ['Celsius', 'Fahrenheit', 'Kelvin']
 else:
-    st.write("Please enter a password.")
+    units = list(UNITS[category]['units'].keys())
 
-# Generate strong password button
-if st.button("Generate Strong Password"):
-    suggested_password = generate_strong_password()
-    st.write("Suggested Strong Password:")
-    st.code(suggested_password)
+# Unit selection and swap button
+col1, col2, col3 = st.columns([2, 1, 2])
+with col1:
+    from_unit = st.selectbox("From", units, key='from_unit')
+with col3:
+    to_unit = st.selectbox("To", units, key='to_unit')
+# with col2:
+#     if st.button("🔄 Swap"):
+#         st.session_state.from_unit, st.session_state.to_unit = to_unit, from_unit
+#         st.experimental_rerun()
+
+# Input value and precision
+value = st.number_input("Enter Value", value=0.0, step=0.1)
+precision = st.slider("Decimal Places", 0, 10, 6)
+
+# Perform conversion
+try:
+    result = convert_value(value, from_unit, to_unit, category)
+    result_text = f"{value} {from_unit} = {result:.{precision}f} {to_unit}"
+    st.markdown(f'<div class="result">{result_text}</div>', unsafe_allow_html=True)
+except Exception as e:
+    st.error(f"Conversion error: {e}")
+
+# Recent conversions (stored in session state)
+if 'recent_conversions' not in st.session_state:
+    st.session_state.recent_conversions = []
+if 'result_text' in locals():
+    st.session_state.recent_conversions.append(result_text)
+    st.subheader("Recent Conversions")
+    for conv in st.session_state.recent_conversions[-5:]:  # Show last 5
+        st.write(conv)
